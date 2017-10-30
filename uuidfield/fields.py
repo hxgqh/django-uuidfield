@@ -1,7 +1,7 @@
 import uuid
 
 from django import forms
-from django.db.models import Field, SubfieldBase
+from django.db.models import Field
 try:
     from django.utils.encoding import smart_unicode
 except ImportError:
@@ -32,6 +32,26 @@ class StringUUID(uuid.UUID):
         return len(self.__str__())
 
 
+class Creator(object):
+    """
+    Field descriptor that calls the to_python method on assignment.
+
+    This matches the Django<=1.9 fields.subclassing.Creator class.
+    See the Django 1.8 release notes where SubFieldBase was deprecated for
+    more: https://docs.djangoproject.com/en/1.10/releases/1.8/#subfieldbase
+    """
+    def __init__(self, field):
+        self.field = field
+
+    def __get__(self, obj, type=None):
+        if obj is None:
+            return self
+        return obj.__dict__[self.field.name]
+
+    def __set__(self, obj, value):
+        obj.__dict__[self.field.name] = self.field.to_python(value)
+
+
 class UUIDField(Field):
     """
     A field which stores a UUID value in hex format. This may also have the
@@ -40,7 +60,6 @@ class UUIDField(Field):
     this with a DB constraint.
     """
     # TODO: support binary storage types
-    __metaclass__ = SubfieldBase
 
     def __init__(self, version=4, node=None, clock_seq=None,
                  namespace=None, name=None, auto=False, hyphenate=False,
@@ -68,6 +87,10 @@ class UUIDField(Field):
         elif version in (3, 5):
             self.namespace, self.name = namespace, name
         super(UUIDField, self).__init__(*args, **kwargs)
+
+    def contribute_to_class(self, cls, name, **kwargs):
+        super(UUIDField, self).contribute_to_class(cls, name, **kwargs)
+        setattr(cls, self.name, Creator(self))
 
     def deconstruct(self):
         name, path, args, kwargs = super(UUIDField, self).deconstruct()
