@@ -9,7 +9,7 @@ setup(
     url='https://github.com/dcramer/django-uuidfield',
     zip_safe=False,
     install_requires=[
-        'django',
+        'django==1.11.6',
     ],
     tests_require=[
         'psycopg2',
